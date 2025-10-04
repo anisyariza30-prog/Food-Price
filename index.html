@@ -236,4 +236,28 @@
       if (!data) { csvPreview.innerHTML = ''; return; }
       const h = data.header;
       const rows = data.rows;
-      let html = '<div style="overflow:auto;max-height:300px"><table><thead><tr>' + h.map(c => `<th>${c}</th>`).join('') + '</tr></
+      let html = '<div style="overflow:auto;max-height:300px"><table><thead><tr>' + h.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+      for (const r of rows) {
+        html += '<tr>' + h.map(c => `<td>${r[c] !== undefined ? r[c] : ''}</td>`).join('') + '</tr>';
+      }
+      html += '</tbody></table></div>';
+      csvPreview.innerHTML = html;
+    }
+
+    downloadCsv.addEventListener('click', () => {
+      if (!lastResults) { alert('No processed results to download. Process a CSV first.'); return; }
+      const header = lastResults.header.join(',') + '\n';
+      const lines = lastResults.rows.map(r => lastResults.header.map(h => `${r[h] !== undefined ? r[h] : ''}`).join(',')).join('\n');
+      const blob = new Blob([header + lines], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'predicted_food.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
