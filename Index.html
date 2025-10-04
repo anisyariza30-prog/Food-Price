@@ -1,103 +1,176 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Food Cost Prediction DSS</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f7f7f7;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            width: 300px;
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        label {
-            font-size: 16px;
-            margin: 5px 0;
-            display: block;
-        }
-        input {
-            width: 100%;
-            padding: 8px;
-            margin: 8px 0;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .result {
-            margin-top: 20px;
-            font-size: 18px;
-            text-align: center;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple DSS — Predict Food Expenditure</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;margin:24px;background:#f7fafc;color:#0f172a}
+    .card{background:white;border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(2,6,23,0.06);max-width:880px;margin:auto}
+    h1{font-size:20px;margin:0 0 8px}
+    label{display:block;margin-top:12px;font-size:14px}
+    input[type=number], input[type=file], button, select{padding:8px 10px;border-radius:8px;border:1px solid #e6e9ef;font-size:14px}
+    .row{display:flex;gap:12px;align-items:center}
+    .muted{color:#64748b;font-size:13px}
+    pre{background:#0b1220;color:#e6f0ff;padding:12px;border-radius:8px;font-size:13px;overflow:auto}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #eef2f7;text-align:left}
+    .small{font-size:13px}
+    .actions{margin-top:12px;display:flex;gap:8px}
+    .danger{background:#ef4444;color:white;border:none}
+    .primary{background:#0ea5a4;color:white;border:none}
+  </style>
 </head>
 <body>
+  <div class="card">
+    <h1>Simple DSS — Predict Food Expenditure</h1>
+    <p class="muted">Model: <em>food = -1.1183 + 0.1482 &times; income + 0.7931 &times; family_size</em></p>
 
-<div class="container">
-    <h2>Food Cost Prediction</h2>
-    <label for="income">Income ($):</label>
-    <input type="number" id="income" placeholder="Enter income">
-    
-    <label for="family_size">Family Size:</label>
-    <input type="number" id="family_size" placeholder="Enter family size">
-    
-    <button onclick="predictFoodCost()">Predict Food Cost</button>
+    <div>
+      <label>Income ($):</label>
+      <input id="income" type="number" step="0.01" min="0" value="50">
 
-    <div class="result" id="result"></div>
-</div>
+      <label>Family size (persons):</label>
+      <input id="family" type="number" step="1" min="1" value="3">
 
-<script>
-    function predictFoodCost() {
-        // Get values from input fields
-        var income = parseFloat(document.getElementById('income').value);
-        var familySize = parseFloat(document.getElementById('family_size').value);
+      <div class="actions">
+        <button id="predictBtn" class="primary">Predict</button>
+        <button id="clearBtn">Clear</button>
+      </div>
 
-        // Check if the inputs are valid numbers
-        if (isNaN(income) || isNaN(familySize) || income <= 0 || familySize <= 0) {
-            document.getElementById('result').innerHTML = "Please enter valid values for Income and Family Size.";
-            return;
-        }
+      <h3>Prediction</h3>
+      <div id="result" class="small">Enter income and family size, then click <strong>Predict</strong>.</div>
+    </div>
 
-        // Regression coefficients from the model
-        var intercept = -1.1183;
-        var coefIncome = 0.1482;
-        var coefFamilySize = 0.7931;
+    <hr />
 
-        // Calculate predicted food cost using the regression formula
-        var foodCost = intercept + coefIncome * income + coefFamilySize * familySize;
+    <h3>Batch prediction from CSV</h3>
+    <p class="muted">Upload a CSV with <code>income</code> and <code>family</code> columns (header names optional: the app will try to detect). The tool will return the same rows plus a <code>predicted_food</code> column.</p>
 
-        // Display the result
-        document.getElementById('result').innerHTML = "Predicted Food Cost: $" + foodCost.toFixed(2);
+    <input id="csvfile" type="file" accept="text/csv" />
+    <div class="actions">
+      <button id="processCsv" class="primary">Process CSV</button>
+      <button id="downloadCsv">Download Results</button>
+    </div>
+
+    <div id="csvPreview"></div>
+  </div>
+
+  <script>
+    // Coefficients from the fitted model
+    const intercept = -1.1183;
+    const bIncome = 0.1482;
+    const bFamily = 0.7931;
+
+    function predict(income, family){
+      // Validate numeric inputs
+      income = Number(income);
+      family = Number(family);
+      if (Number.isNaN(income) || Number.isNaN(family)) return NaN;
+      return intercept + bIncome * income + bFamily * family;
     }
-</script>
 
+    const incomeInput = document.getElementById('income');
+    const familyInput = document.getElementById('family');
+    const predictBtn = document.getElementById('predictBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const resultDiv = document.getElementById('result');
+
+    predictBtn.addEventListener('click', ()=>{
+      const inc = incomeInput.value;
+      const fam = familyInput.value;
+      const pred = predict(inc, fam);
+      if (Number.isNaN(pred)){
+        resultDiv.innerHTML = '<span style="color:#ef4444">Invalid input — please enter numeric values.</span>';
+        return;
+      }
+      resultDiv.innerHTML = <strong>Predicted food expenditure:</strong> ${pred.toFixed(2)} $;
+    });
+
+    clearBtn.addEventListener('click', ()=>{
+      incomeInput.value = '';
+      familyInput.value = '';
+      resultDiv.textContent = 'Enter income and family size, then click Predict.';
+    });
+
+    // CSV batch processing
+    let lastResults = null;
+    const csvfile = document.getElementById('csvfile');
+    const processCsv = document.getElementById('processCsv');
+    const csvPreview = document.getElementById('csvPreview');
+    const downloadCsv = document.getElementById('downloadCsv');
+
+    function parseCSV(text){
+      // Very small CSV parser (no quotes handling) — expects rows newline-separated, comma-separated values
+      const lines = text.trim().split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+      if(lines.length===0) return [];
+      const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
+      const rows = lines.slice(1).map(line=>{
+        const parts = line.split(',').map(p=>p.trim());
+        const obj = {};
+        for(let i=0;i<parts.length;i++) obj[header[i]||col${i}]=parts[i];
+        return obj;
+      });
+      return {header, rows};
+    }
+
+    processCsv.addEventListener('click', ()=>{
+      const file = csvfile.files[0];
+      if(!file){
+        alert('Please select a CSV file first.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e){
+        try{
+          const parsed = parseCSV(e.target.result);
+          const header = parsed.header;
+          const rows = parsed.rows;
+          // try to detect income & family column names
+          const incomeKeys = header.filter(h=>h.includes('income'));
+          const familyKeys = header.filter(h=>h.includes('family')||h.includes('household')||h.includes('size'));
+          const incKey = incomeKeys[0] || header[0];
+          const famKey = familyKeys[0] || header[1] || header.find(h=>h.includes('family')) || header[1];
+
+          const out = rows.map(r=>{
+            const inc = Number(r[incKey]);
+            const fam = Number(r[famKey]);
+            const pred = predict(inc, fam);
+            return Object.assign({}, r, {predicted_food: Number.isNaN(pred)?'':pred.toFixed(2)});
+          });
+
+          lastResults = {header: [...header, 'predicted_food'], rows: out};
+          renderTable(lastResults);
+        }catch(err){
+          alert('Failed to parse CSV: '+err);
+        }
+      }
+      reader.readAsText(file);
+    });
+
+    function renderTable(data){
+      if(!data) { csvPreview.innerHTML=''; return; }
+      const h = data.header;
+      const rows = data.rows;
+      let html = '<div style="overflow:auto;max-height:300px"><table><thead><tr>' + h.map(c=><th>${c}</th>).join('') + '</tr></thead><tbody>';
+      for(const r of rows){
+        html += '<tr>' + h.map(c=><td>${r[c]!==undefined?r[c]:''}</td>).join('') + '</tr>';
+      }
+      html += '</tbody></table></div>';
+      csvPreview.innerHTML = html;
+    }
+
+    downloadCsv.addEventListener('click', ()=>{
+      if(!lastResults){ alert('No processed results to download. Process a CSV first.'); return; }
+      const header = lastResults.header.join(',') + '\n';
+      const lines = lastResults.rows.map(r=> lastResults.header.map(h=>"${(r[h]!==undefined?r[h]:'')}").join(',')).join('\n');
+      const blob = new Blob([header + lines], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'predicted_food.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+  </script>
 </body>
 </html>
