@@ -19,7 +19,9 @@
     .actions{margin-top:12px;display:flex;gap:8px}
     .danger{background:#ef4444;color:white;border:none}
     .primary{background:#0ea5a4;color:white;border:none}
+    canvas{margin-top:16px;max-width:100%;}
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="card">
@@ -40,6 +42,8 @@
 
       <h3>Prediction</h3>
       <div id="result" class="small">Enter income and family size, then click <strong>Predict</strong>.</div>
+
+      <canvas id="predictionChart"></canvas>
     </div>
 
     <hr />
@@ -63,7 +67,6 @@
     const bFamily = 0.7931;
 
     function predict(income, family){
-      // Validate numeric inputs
       income = Number(income);
       family = Number(family);
       if (Number.isNaN(income) || Number.isNaN(family)) return NaN;
@@ -75,6 +78,22 @@
     const predictBtn = document.getElementById('predictBtn');
     const clearBtn = document.getElementById('clearBtn');
     const resultDiv = document.getElementById('result');
+    const ctx = document.getElementById('predictionChart').getContext('2d');
+
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Prediction'],
+        datasets: [{
+          label: 'Food Expenditure ($)',
+          data: [0],
+          backgroundColor: '#0ea5a4'
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: true } }
+      }
+    });
 
     predictBtn.addEventListener('click', ()=>{
       const inc = incomeInput.value;
@@ -85,12 +104,16 @@
         return;
       }
       resultDiv.innerHTML = <strong>Predicted food expenditure:</strong> ${pred.toFixed(2)} $;
+      chart.data.datasets[0].data = [pred];
+      chart.update();
     });
 
     clearBtn.addEventListener('click', ()=>{
       incomeInput.value = '';
       familyInput.value = '';
       resultDiv.textContent = 'Enter income and family size, then click Predict.';
+      chart.data.datasets[0].data = [0];
+      chart.update();
     });
 
     // CSV batch processing
@@ -101,7 +124,6 @@
     const downloadCsv = document.getElementById('downloadCsv');
 
     function parseCSV(text){
-      // Very small CSV parser (no quotes handling) — expects rows newline-separated, comma-separated values
       const lines = text.trim().split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
       if(lines.length===0) return [];
       const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
@@ -126,7 +148,6 @@
           const parsed = parseCSV(e.target.result);
           const header = parsed.header;
           const rows = parsed.rows;
-          // try to detect income & family column names
           const incomeKeys = header.filter(h=>h.includes('income'));
           const familyKeys = header.filter(h=>h.includes('family')||h.includes('household')||h.includes('size'));
           const incKey = incomeKeys[0] || header[0];
